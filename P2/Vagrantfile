@@ -1,0 +1,39 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+#ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+
+Vagrant.configure("2") do |config|
+	config.vm.define "afarajiS" do |afaraji|
+		afaraji.vm.box = "centos/8"
+		afaraji.vm.hostname = "afarajiS"
+		afaraji.vm.box_url = "centos/8"
+		afaraji.vm.network :private_network, ip: "192.168.42.110"
+		afaraji.vm.provider :virtualbox do |v|
+			v.customize ["modifyvm", :id, "--name", "afarajiS"]
+			v.customize ["modifyvm", :id, "--memory", 2024]
+			v.customize ["modifyvm", :id, "--cpus", "1"]
+		end
+		afaraji.vm.provision "shell", inline: <<-SHELL
+		yum install -y -q net-tools
+		curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--flannel-iface eth1" K3S_KUBECONFIG_MODE="644" sh -
+		x=1
+		while true
+		do
+			/usr/local/bin/kubectl get nodes | grep -q 'NotReady'
+			if [ $? == 0 ]; then
+				echo "NOOOOT RDY"
+			else
+				echo "DEPLYING APPS"
+				/usr/local/bin/kubectl apply -f /vagrant/manifests
+				break
+			fi
+			sleep 1
+		done
+		SHELL
+		# afaraji.trigger.after :up, :provision do |trigger|
+		# 	trigger.run_remote = {inline: "kubectl apply -f /vagrant/manifests"}
+		# end
+		#afaraji.vm.provision "file", source: "./dep.yaml", destination: "/tmp/dep.yaml"
+	end
+end

@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+#ENV['VAGRANT_NO_PARALLEL'] = 'yes'
+
+Vagrant.configure("2") do |config|
+	config.vm.define "afarajiS" do |afarajiS|
+		afarajiS.vm.box = "centos/8"
+		afarajiS.vm.hostname = "afarajiS"
+		afarajiS.vm.box_url = "centos/8"
+		afarajiS.vm.network :private_network, ip: "192.168.42.110"
+		afarajiS.vm.provider :virtualbox do |v|
+			v.customize ["modifyvm", :id, "--name", "afarajiS"]
+			v.customize ["modifyvm", :id, "--memory", 1024]
+			v.customize ["modifyvm", :id, "--cpus", "1"]
+		end
+		afarajiS.vm.provision "shell", inline: <<-SHELL
+		yum install -y -q net-tools
+		curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--flannel-iface eth1" K3S_KUBECONFIG_MODE="644" sh -
+		SHELL
+		afarajiS.trigger.after :up, :provision do |trigger|
+			trigger.run = {inline: "bash -c 'vagrant ssh afarajiS -c \"sudo cat /var/lib/rancher/k3s/server/token\" > ./token && echo \"TOKEN file copied correctly\"'"}
+		end
+	end
+
+	config.vm.define "sazouakaSW" do |sazouakaSW|
+		sazouakaSW.vm.box = "centos/8"
+		sazouakaSW.vm.hostname = "sazouakaSW"
+		sazouakaSW.vm.box_url = "centos/8"
+		sazouakaSW.vm.network :private_network, ip: "192.168.42.111"
+		sazouakaSW.vm.provider :virtualbox do |v|
+			v.customize ["modifyvm", :id, "--name", "sazouakaSW"]
+			v.customize ["modifyvm", :id, "--memory", 1024]
+			v.customize ["modifyvm", :id, "--cpus", "1"]
+		end
+		sazouakaSW.vm.provision "file", source: "./token", destination: "/tmp/token"
+		sazouakaSW.vm.provision "shell", inline: <<-SHELL
+		yum install -y -q net-tools
+		curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--flannel-iface eth1" K3S_KUBECONFIG_MODE="644" K3S_URL="https://192.168.42.110:6443" K3S_TOKEN_FILE="/tmp/token" sh -
+		SHELL
+	end
+end
