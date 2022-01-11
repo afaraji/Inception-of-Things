@@ -44,37 +44,34 @@ if [ $ANSWER != 'y' ]
 then
 	exit
 fi
-############### argoCD install  #################
-
+############### creating cluster|exposing ports 8080->80 and 8888->8888 #################
+echo -e "${GREEN}---- Creating dev-cluster ----${NC}"
 sudo k3d cluster create dev-cluster --port 8080:80@loadbalancer --port 8888:8888@loadbalancer
+############### argoCD install  #################
+echo -e "${GREEN}---- Installing argoCD ----${NC}"
+sudo curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+sudo chmod +x /usr/local/bin/argocd
 sudo kubectl create namespace argocd
+# ---> xpose argoCD by ingres conf
 #sudo kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 # ---> expose argoCD API Server by Changing the argocd-server service type to LoadBalancer
 #sudo kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "LoadBalancer"}}'
-# ---> xpose argoCD by ingres conf
-#sudo wget https://raw.githubusercontent.com/argoproj/argo-cd/v2.0.1/manifests/install.yaml
 
 sudo kubectl apply -n argocd -f conf/install_argocd.yaml
 sudo kubectl apply -n argocd -f conf/ingress_argocd.yaml
-while true
-do
-	sudo kubectl get pods -n argocd | tail -n +2 | awk '{print $3}' | grep -v "Running"
-	if [ $? == 0 ]; then
-		break
-	else
-		echo "WAITING for argoCD..."
-	fi
-	sleep 1
-done
-###########check url: https://stackoverflow.com/questions/44140593/how-to-run-command-after-initialization ##########
-#lifecycle:
-#            postStart:
-#              exec:
-#                command: ["/bin/sh", "-c", {{cmd}}]
-##################3
-printf "${RED}###############################################\n"
-printf "connect on port 8080/argocd\n"
-printf "${GREEN}your credentiels are:${NC} admin:$(sudo kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)\n"
+printf "${GREEN}WAITING for argoCD...\n"
+kubectl -n argocd rollout status deployment argocd-server
+printf "fetching user and password${NC}\n"
 
+printf "${RED}###############################################${NC}\n"
+DEF_HOST=$(/usr/sbin/ifconfig enp0s3 | /usr/bin/grep broadcast | /usr/bin/awk '{print $2}')
+printf "connect on${GREEN} ${DEF_HOST}:8080/argocd${NC}\n\n"
+printf "${RED}###############################################${NC}\n"
+PASS=$(sudo kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+printf "USERNAME: ${GREEN}admin${NC}\nPASSWORD: ${GREEN}${PASS}${NC}\n"
+printf "${RED}###############################################${NC}\n"
+
+############### Deploying argoCD app  #################
+echo -e "${GREEN}---- Deploying argoCD APP ----${NC}"
 sudo kubectl apply -n argocd -f conf/app_argocd.yaml
 printf "${GREEN}################### DONE ######################${NC}\n"
