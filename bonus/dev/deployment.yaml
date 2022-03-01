@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-app
+spec:
+  selector:
+    matchLabels:
+      app: gitlab-app
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: gitlab-app
+    spec:
+      containers:
+      - name: gitlab-app
+        image: wil42/playground:v1
+        ports:
+        - containerPort: 8888
